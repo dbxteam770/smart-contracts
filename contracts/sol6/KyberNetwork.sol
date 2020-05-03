@@ -252,7 +252,7 @@ contract KyberNetwork is WithdrawableNoModifiers, Utils5, IKyberNetwork, Reentra
         require(startIndex <= endIndex, "invalid indices");
 
         address[] memory reserves = kyberStorage.getReserveAddressesPerTokenSrc(
-            address(token), startIndex, endIndex
+            token, startIndex, endIndex
         );
 
         require(reserves.length > 0, "reserve list is empty");

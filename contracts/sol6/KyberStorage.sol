@@ -27,8 +27,8 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
     mapping(bytes32 => address[]) internal reserveIdToAddresses;
     mapping(bytes32 => address) internal reserveRebateWallet;
     mapping(address => bytes32) internal reserveAddressToId;
-    mapping(address => bytes32[]) internal reservesPerTokenSrc; // reserves supporting token to eth
-    mapping(address => bytes32[]) internal reservesPerTokenDest; // reserves support eth to token
+    mapping(IERC20 => bytes32[]) internal reservesPerTokenSrc; // reserves supporting token to eth
+    mapping(IERC20 => bytes32[]) internal reservesPerTokenDest; // reserves support eth to token
 
     uint256 internal feeAccountedPerType = 0xffffffff;
     uint256 internal entitledRebatePerType = 0xffffffff;
@@ -365,7 +365,7 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
         }
     }
 
-    function getReserveIdsPerTokenSrc(address token)
+    function getReserveIdsPerTokenSrc(IERC20 token)
         external
         view
         override
@@ -378,7 +378,7 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
     ///      in case we have a long list of reserves, approving all of them could run out of gas
     ///      using startIndex and endIndex to prevent above scenario
     ///      also enable us to approve reserve one by one
-    function getReserveAddressesPerTokenSrc(address token, uint256 startIndex, uint256 endIndex)
+    function getReserveAddressesPerTokenSrc(IERC20 token, uint256 startIndex, uint256 endIndex)
         external
         view
         override
@@ -398,7 +398,7 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
         }
     }
 
-    function getReserveIdsPerTokenDest(address token)
+    function getReserveIdsPerTokenDest(IERC20 token)
         external
         view
         override
@@ -541,9 +541,9 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
         uint256 feeAccountedData = feeAccountedPerType;
 
         for (uint256 i = 0; i < reserveIds.length; i++) {
-            uint256 resTypeUint = reserveType[reserveIds[i]];
-            entitledRebateArr[i] = (entitledRebateData & (1 << resTypeUint) > 0);
-            feeAccountedArr[i] = (feeAccountedData & (1 << resTypeUint) > 0);
+            uint256 resType = reserveType[reserveIds[i]];
+            entitledRebateArr[i] = (entitledRebateData & (1 << resType) > 0);
+            feeAccountedArr[i] = (feeAccountedData & (1 << resType) > 0);
             reserveAddresses[i] = IKyberReserve(reserveIdToAddresses[reserveIds[i]][0]);
         }
     }
@@ -555,10 +555,10 @@ contract KyberStorage is IKyberStorage, PermissionGroupsNoModifiers, Utils5 {
         bool add
     ) internal {
         uint256 i;
-        bytes32[] storage reserveArr = reservesPerTokenDest[address(token)];
+        bytes32[] storage reserveArr = reservesPerTokenDest[token];
 
         if (isTokenToEth) {
-            reserveArr = reservesPerTokenSrc[address(token)];
+            reserveArr = reservesPerTokenSrc[token];
         }
 
         for (i = 0; i < reserveArr.length; i++) {

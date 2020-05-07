@@ -86,15 +86,14 @@ async function sendTx(txObject, gasLimit) {
   }
 }
 
-async function deployContract(solcOutput, contractName, name, ctorArgs) {
+async function deployContract(artifacts, contractName, ctorArgs) {
 
-  const actualName = contractName;
-  const contract = solcOutput.contracts[actualName][name];
-  const bytecode = contract["evm"]["bytecode"]["object"];
-  const abi = contract['abi'];
+  const contract = artifacts[contractName];
+  const bytecode = contract.bytecode;
+  const abi = contract.abi;
   const myContract = new web3.eth.Contract(abi);
 
-  const deploy = myContract.deploy({data:"0x" + bytecode, arguments: ctorArgs});
+  const deploy = myContract.deploy({data: bytecode, arguments: ctorArgs});
   let address = "0x" + web3.utils.sha3(RLP.encode([sender,nonce])).slice(12).substring(14);
   address = web3.utils.toChecksumAddress(address);
 
@@ -127,6 +126,7 @@ let burnConfigSetter;
 
 //misc variables needed for contracts deployment, should be obtained from input json
 let isFeeAccounted;
+let isEntitledRebate;
 let maxGasPrice = (new BN(50).mul(new BN(10).pow(new BN(9)))).toString();
 let negDiffInBps;
 let burnBlockInterval;
@@ -185,6 +185,7 @@ function parseInput( jsonInput ) {
 
     //constants
     isFeeAccounted = jsonInput["isFeeAccounted"];
+    isEntitledRebate = jsonInput["isEntitledRebate"];
     maxGasPrice = jsonInput["max gas price"].toString();
     negDiffInBps = jsonInput["neg diff in bps"].toString();
     burnBlockInterval = jsonInput["burn block interval"].toString();
@@ -238,9 +239,8 @@ async function main() {
 
   chainId = chainId || await web3.eth.net.getId()
   console.log('chainId', chainId);
-  console.log('starting compilation');
-  output = await require("../compileContracts.js").compileContracts("sol5");
-  console.log("finished compilation");
+  console.log('retrieving artifacts...');
+  output = await require("../retrieveArtifacts.js").retrieveArtifacts();
 
   //reinstantiate web3 (solc overwrites something)
   web3 = new Web3(new Web3.providers.HttpProvider(rpcUrl));
@@ -272,8 +272,8 @@ async function main() {
   //////////////////
   // REDEPLOYMENT //
   //////////////////
-  await setupMatchingEngine();
-  await setupDAOStuff();
+  // await setupMatchingEngine();
+  // await setupDAOStuff();
 
   /////////////////////
   // ADDING RESERVES //
@@ -306,13 +306,14 @@ async function fullDeployment() {
   await setDAOInStaking();
   await setProxyInNetwork();
   await setNetworkInProxy();
-  await setTempOperatorToNetwork();
+  await setTempOperatorToStorage();
 
   ///////////
   // BREAK //
   ///////////
   await pressToContinue();
   await setFeeAccountedDataInStorage();
+  await setRebateEntitledDataInStorage();
   await addReserves();
   await listTokensForReserves();
   await configureAndEnableNetwork();
@@ -321,7 +322,7 @@ async function fullDeployment() {
   // BREAK //
   ///////////
   await pressToContinue();
-  await removeTempOperator([networkContract]);
+  await removeTempOperator([storageContract]);
   await pressToContinue();
   await setPermissionsInProxy();
   await pressToContinue();
@@ -383,12 +384,12 @@ function verifyInput() {
 async function deployMatchingEngineContract(output) {
   if (matchingEngineAddress == "") {
     console.log("deploying matching engine");
-    [matchingEngineAddress, matchingEngineContract] = await deployContract(output, "KyberMatchingEngine.sol", "KyberMatchingEngine", [sender]);
+    [matchingEngineAddress, matchingEngineContract] = await deployContract(output, "KyberMatchingEngine", [sender]);
     console.log(`matchingEngine: ${matchingEngineAddress}`);
   } else {
     console.log("Instantiating matching engine...");
     matchingEngineContract = new web3.eth.Contract(
-      output.contracts["KyberMatchingEngine.sol"]["KyberMatchingEngine"].abi, matchingEngineAddress
+      output["KyberMatchingEngine"].abi, matchingEngineAddress
     );
   }
 }
@@ -396,12 +397,12 @@ async function deployMatchingEngineContract(output) {
 async function deployStorageContract(output) {
   if (storageAddress == "") {
     console.log("deploying storage");
-    [storageAddress, storageContract] = await deployContract(output, "KyberStorage.sol", "KyberStorage", [sender]);
+    [storageAddress, storageContract] = await deployContract(output, "KyberStorage", [sender]);
     console.log(`storage: ${storageAddress}`);
   } else {
     console.log("Instantiating storage...");
     storageContract = new web3.eth.Contract(
-      output.contracts["KyberStorage.sol"]["KyberStorage"].abi, storageAddress
+      output["KyberStorage"].abi, storageAddress
     );
   }
 }
@@ -409,12 +410,12 @@ async function deployStorageContract(output) {
 async function deployNetworkContract(output) {
   if (networkAddress == "") {
     console.log("deploying kyber network");
-    [networkAddress, networkContract] = await deployContract(output, "KyberNetwork.sol", "KyberNetwork", [sender, storageAddress]);
+    [networkAddress, networkContract] = await deployContract(output, "KyberNetwork", [sender, storageAddress]);
     console.log(`network: ${networkAddress}`);
   } else {
     console.log("Instantiating network...");
     networkContract = new web3.eth.Contract(
-    output.contracts["KyberNetwork.sol"]["KyberNetwork"].abi, networkAddress
+    output["KyberNetwork"].abi, networkAddress
     );
   }
 }
@@ -422,12 +423,12 @@ async function deployNetworkContract(output) {
 async function deployProxyContract(output) {
   if (proxyAddress == "") {
     console.log("deploying KNProxy");
-    [proxyAddress, proxyContract] = await deployContract(output, "KyberNetworkProxy.sol", "KyberNetworkProxy", [sender]);
+    [proxyAddress, proxyContract] = await deployContract(output, "KyberNetworkProxy", [sender]);
     console.log(`KNProxy: ${proxyAddress}`);
   } else {
     console.log("Instantiating proxy...");
     proxyContract = new web3.eth.Contract(
-      output.contracts["KyberNetworkProxy.sol"]["KyberNetworkProxy"].abi, proxyAddress
+      output["KyberNetworkProxy"].abi, proxyAddress
     );
   }
 }
@@ -436,14 +437,14 @@ async function deployFeeHandlerContract(output) {
   if (feeHandlerAddress == "") {
     console.log("deploying feeHandler");
     [feeHandlerAddress, feeHandlerContract] = await deployContract(
-      output, "KyberFeeHandler.sol", "KyberFeeHandler", 
+      output, "KyberFeeHandler", 
       [sender, proxyAddress, networkAddress, kncTokenAddress, burnBlockInterval, burnConfigSetter]
     );
     console.log(`Fee Handler: ${feeHandlerAddress}`);
   } else {
     console.log("Instantiating feeHandler...");
     feeHandlerContract = new web3.eth.Contract(
-      output.contracts["KyberFeeHandler.sol"]["KyberFeeHandler"].abi, feeHandlerAddress
+      output["KyberFeeHandler"].abi, feeHandlerAddress
     );
   }
 }
@@ -452,14 +453,14 @@ async function deployStakingContract(output) {
     if (stakingAddress == "") {
         console.log("deploying staking contract");
         [stakingAddress, stakingContract] = await deployContract(
-            output, "KyberStaking.sol", "KyberStaking", 
+            output, "KyberStaking", 
             [kncTokenAddress, epochPeriod, startTimestamp, sender]
         );
         console.log(`Staking: ${stakingAddress}`);
     } else {
         console.log("Instantiating staking...");
         stakingContract = new web3.eth.Contract(
-        output.contracts["KyberStaking.sol"]["KyberStaking"].abi, stakingAddress
+        output["KyberStaking"].abi, stakingAddress
         );
     }
 };
@@ -468,7 +469,7 @@ async function deployDAOContract(output) {
     if (daoAddress == "") {
         console.log("deploying DAO contract");
         [daoAddress, DAOContract] = await deployContract(
-            output, "KyberDAO.sol", "KyberDAO",
+            output, "KyberDAO",
             [
               epochPeriod, startTimestamp, stakingAddress, feeHandlerAddress, kncTokenAddress,
               networkFeeBps, rewardFeeBps, rebateFeeBps, daoCampaignCreator
@@ -478,7 +479,7 @@ async function deployDAOContract(output) {
     } else {
         console.log("Instantiating DAO...");
         DAOContract = new web3.eth.Contract(
-        output.contracts["KyberDAO.sol"]["KyberDAO"].abi, daoAddress
+        output["KyberDAO"].abi, daoAddress
         );
     }
 };
@@ -542,28 +543,35 @@ async function setNetworkInProxy() {
   await sendTx(proxyContract.methods.setKyberNetwork(networkAddress));
 }
 
-async function setTempOperatorToNetwork() {
+async function setTempOperatorToStorage() {
   // add operator to network
-  console.log("set temp operator: network");
-  await sendTx(networkContract.methods.addOperator(sender));
+  console.log("set temp operator: storage");
+  await sendTx(storageContract.methods.addOperator(sender));
 }
 
 async function setFeeAccountedDataInStorage() {
-  console.log("set fee paying data: matching engine");
+  console.log("set fee paying data: storage");
   await sendTx(storageContract.methods.setFeeAccountedPerReserveType(
+    isFeeAccounted["FPR"], isFeeAccounted["APR"], isFeeAccounted["BRIDGE"], isFeeAccounted["UTILITY"], isFeeAccounted["CUSTOM"], isFeeAccounted["ORDERBOOK"]
+  ));
+}
+
+async function setRebateEntitledDataInStorage() {
+  console.log("set rebate entitled data: storage");
+  await sendTx(storageContract.methods.setEntitledRebatePerReserveType(
     isFeeAccounted["FPR"], isFeeAccounted["APR"], isFeeAccounted["BRIDGE"], isFeeAccounted["UTILITY"], isFeeAccounted["CUSTOM"], isFeeAccounted["ORDERBOOK"]
   ));
 }
 
 async function addReserves(reserveIndex) {
   // add reserve to network
-  console.log("Add reserves to network");
+  console.log("Add reserves to storage");
   reserveIndex = (reserveIndex == undefined) ? 0 : reserveIndex;
   for (let i = reserveIndex ; i < reserveDataArray.length ; i++) {
     const reserve = reserveDataArray[i];
     console.log(`Reserve array index ${i}`);
     console.log(`Adding reserve ${reserve.address}`);
-    await sendTx(networkContract.methods.addReserve(reserve.address, reserve.id, reserve.type, reserve.wallet));
+    await sendTx(storageContract.methods.addReserve(reserve.address, reserve.id, reserve.type, reserve.wallet));
     await pressToContinue();
   }
 }
@@ -577,8 +585,8 @@ async function listTokensForReserves(reserveIndex, tokenIndex) {
     for (let j = tokenIndex ; j < tokens.length ; j++) {
       token = tokens[j];
       console.log(`Reserve array index ${i}, token array index ${j}`);
-      console.log(`listing token ${token.address} for reserve ${reserve.address}`);
-      await sendTx(networkContract.methods.listPairForReserve(reserve.address,token.address,token.ethToToken,token.tokenToEth,true));
+      console.log(`listing token ${token.address} for reserve ${reserve.id}`);
+      await sendTx(storageContract.methods.listPairForReserve(reserve.id,token.address,token.ethToToken,token.tokenToEth,true));
     }
     await pressToContinue();
   }

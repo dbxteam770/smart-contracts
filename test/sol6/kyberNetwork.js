@@ -143,7 +143,7 @@ contract('KyberNetwork', function(accounts) {
         let tempMatchingEngine3;
 
         beforeEach("create new network", async() =>{
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
             tempMatchingEngine = await MatchingEngine.new(admin);
 
@@ -321,7 +321,7 @@ contract('KyberNetwork', function(accounts) {
             gasHelperAdd = accounts[9];
         })
         beforeEach("global setup", async function(){
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
 
@@ -372,7 +372,7 @@ contract('KyberNetwork', function(accounts) {
         let rateHelper;
 
         before("setup contracts ", async() => {
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             await tempStorage.addOperator(operator, {from: admin});
@@ -542,7 +542,7 @@ contract('KyberNetwork', function(accounts) {
             let reserveAddresses;
 
             beforeEach("setup data", async() => {
-                tempStorage = await KyberStorage.new(admin);
+                tempStorage = await nwHelper.setupStorage(admin);
                 tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
                 await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
                 await tempStorage.addOperator(operator, {from: admin});
@@ -707,7 +707,7 @@ contract('KyberNetwork', function(accounts) {
         let tempStorage;
 
         before("global setup", async function(){
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await MockNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             tempMatchingEngine = await MatchingEngine.new(admin);
@@ -747,7 +747,7 @@ contract('KyberNetwork', function(accounts) {
 
     describe("test adding and removing reserves with fault matching engine", async() => {
         beforeEach("global setup ", async() => {
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             await tempStorage.addOperator(operator, {from: admin});
@@ -814,7 +814,7 @@ contract('KyberNetwork', function(accounts) {
             await DAO.setNetworkFeeBps(networkFeeBps);
 
             // init storage and network
-            storage = await KyberStorage.new(admin);
+            storage = await nwHelper.setupStorage(admin);
             network = await KyberNetwork.new(admin, storage.address);
             await storage.setNetworkContract(network.address, {from: admin});
             await storage.addOperator(operator, {from: admin});
@@ -1630,7 +1630,7 @@ contract('KyberNetwork', function(accounts) {
                 destDecimals = tokenDecimals[1];
 
                 // init storage and network
-                mockStorage = await KyberStorage.new(admin);
+                mockStorage = await nwHelper.setupStorage(admin);
                 mockNetwork = await KyberNetwork.new(admin, mockStorage.address);
                 await mockStorage.setNetworkContract(mockNetwork.address, {from: admin});
                 await mockStorage.addOperator(operator, {from: admin});
@@ -1867,7 +1867,7 @@ contract('KyberNetwork', function(accounts) {
         });
 
         it("test revert with high networkFee", async () => {
-            let tempStorage = await KyberStorage.new(admin);
+            let tempStorage = await nwHelper.setupStorage(admin);
             let tempNetwork = await MockNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             await tempNetwork.setContracts(feeHandler.address, matchingEngine.address,
@@ -1883,7 +1883,7 @@ contract('KyberNetwork', function(accounts) {
         });
 
         it("update fee in DAO and see updated in network on correct block", async() => {
-            let tempStorage = await KyberStorage.new(admin);
+            let tempStorage = await nwHelper.setupStorage(admin);
             let tempNetwork = await MockNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, { from: admin });
             expiryTimestamp = new BN(Math.round((new Date()).getTime() / 1000) + 1000);
@@ -1987,7 +1987,7 @@ contract('KyberNetwork', function(accounts) {
         let numberReserves;
         before("init contracts", async () => {
             // init network
-            storage = await KyberStorage.new(admin);
+            storage = await nwHelper.setupStorage(admin);
             network = await KyberNetwork.new(admin, storage.address);
             await storage.setNetworkContract(network.address, { from: admin });
             await storage.addOperator(operator, { from: admin });
@@ -2143,7 +2143,7 @@ contract('KyberNetwork', function(accounts) {
 
         before("initialise network", async () => {
             // init network
-            storage = await KyberStorage.new(admin);
+            storage = await nwHelper.setupStorage(admin);
             network = await KyberNetwork.new(admin, storage.address);
             await storage.setNetworkContract(network.address, {from: admin});
             await storage.addOperator(operator, {from: admin});
@@ -2313,7 +2313,7 @@ contract('KyberNetwork', function(accounts) {
         let tempMatchingEngine;
 
         beforeEach("setup", async function(){
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await MockNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             tempMatchingEngine = await MatchingEngine.new(admin);
@@ -2368,7 +2368,7 @@ contract('KyberNetwork', function(accounts) {
             tempTokens = [];
 
             // init storage and network
-            tempStorage = await KyberStorage.new(admin);
+            tempStorage = await nwHelper.setupStorage(admin);
             tempNetwork = await KyberNetwork.new(admin, tempStorage.address);
             await tempStorage.setNetworkContract(tempNetwork.address, {from: admin});
             await tempStorage.addOperator(operator, {from: admin});
@@ -2528,7 +2528,7 @@ contract('KyberNetwork', function(accounts) {
 
             let KNC = await TestToken.new("kyber network crystal", "KNC", 18);
             //init network 
-            const storage =  await KyberStorage.new(admin);
+            const storage =  await nwHelper.setupStorage(admin);
             network = await KyberNetwork.new(admin, storage.address);
             await storage.setNetworkContract(network.address, {from: admin});
             await storage.addOperator(operator, { from: admin });

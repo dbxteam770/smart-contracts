@@ -14,6 +14,8 @@ const MaliciousReserve2 = artifacts.require("MaliciousReserve2.sol");
 const Helper = require("../helper.js");
 const nwHelper = require("./networkHelper.js");
 
+const fs = require('fs');
+
 const BN = web3.utils.BN;
 const { expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 
@@ -83,6 +85,10 @@ let ethSrcQty = precisionUnits;
 ///////////////////////////
 let expectedResult;
 
+//gas report
+///////////////////////////
+let gasReport = {};
+
 contract('KyberNetwork', function(accounts) {
     before("one time global init", async() => {
         //init accounts
@@ -121,6 +127,24 @@ contract('KyberNetwork', function(accounts) {
         //fees
         networkFeeBps = new BN(20);
         platformFeeBps = new BN(0);
+    });
+
+    after("save gas report to file", async() => {
+        let reportDir = 'report';
+        let jsonContent = JSON.stringify(gasReport, null, '\t');
+        if (process.env.TRAVIS_BRANCH !== undefined) {
+          reportDir = `report/${process.env.TRAVIS_BRANCH}`;
+        }
+        let reportFile = `${reportDir}/gasUsed.json`;
+        if (!fs.existsSync(reportDir)) {
+          fs.mkdirSync(reportDir, {recursive: true});
+        }
+        fs.writeFile(reportFile, jsonContent, 'utf8', function (err) {
+            if (err) {
+                console.log('An error occured while writing JSON Object to File.');
+                return console.log(err);
+            }
+        });
     });
 
     describe("should test adding contracts, and adding / removing proxy.", async() => {
@@ -1231,6 +1255,7 @@ contract('KyberNetwork', function(accounts) {
                     let txResult = await network.tradeWithHint(networkProxy, srcToken.address, srcQty, ethAddress, taker,
                         maxDestAmt, minConversionRate, platformWallet, hint);
                     console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                    gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                     await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, srcQty,
                         initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1270,6 +1295,7 @@ contract('KyberNetwork', function(accounts) {
                     let txResult = await network.tradeWithHint(networkProxy, srcToken.address, srcQty, destToken.address, taker,
                         maxDestAmt, minConversionRate, platformWallet, hint);
                     console.log(`token -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                    gasReport[`token -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                     await nwHelper.compareBalancesAfterTrade(srcToken, destToken, srcQty,
                         initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1295,6 +1321,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(networkProxy, srcToken.address, srcQty, ethAddress, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFee, hint);
                         console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, srcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1334,6 +1361,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(networkProxy, srcToken.address, srcQty, destToken.address, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFee, hint);
                         console.log(`token -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(srcToken, destToken, srcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1415,6 +1443,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, ethAddress, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                         console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
                         await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
                     });
@@ -1440,6 +1469,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, ethAddress, ethSrcQty, destToken.address, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint, {value: ethSrcQty});
                         console.log(`ETH -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`ETH -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(ethAddress, destToken, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, undefined);
@@ -1466,6 +1496,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, destToken.address, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                         console.log(`token -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(srcToken, destToken, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1497,6 +1528,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, ethAddress, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                         console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
                         await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
                     });
@@ -1521,6 +1553,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, ethAddress, ethSrcQty, destToken.address, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint, {value: ethSrcQty});
                         console.log(`ETH -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`ETH -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(ethAddress, destToken, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, undefined);
@@ -1546,6 +1579,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, destToken.address, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                         console.log(`token -> token (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> token (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
 
                         await nwHelper.compareBalancesAfterTrade(srcToken, destToken, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
@@ -1572,6 +1606,7 @@ contract('KyberNetwork', function(accounts) {
                         let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, ethAddress, taker,
                             maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                         console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                        gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
                         await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, actualSrcQty,
                             initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
                     });
@@ -1600,6 +1635,7 @@ contract('KyberNetwork', function(accounts) {
                 let txResult = await network.tradeWithHintAndFee(network.address, srcToken.address, srcQty, ethAddress, taker,
                     maxDestAmt, minConversionRate, platformWallet, platformFeeBps, hint);
                 console.log(`token -> ETH (${tradeStr[hintType]}): ${txResult.receipt.gasUsed} gas used`);
+                gasReport[`token -> ETH (${tradeStr[hintType]})`] = txResult.receipt.gasUsed;
                 await nwHelper.compareBalancesAfterTrade(srcToken, ethAddress, actualSrcQty,
                     initialReserveBalances, initialTakerBalances, expectedResult, taker, network.address);
             });
